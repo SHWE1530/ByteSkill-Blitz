@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-stone-50: #efeeeb;
+  --color-stone-100: #e5e4e0;
+  --color-stone-900: #1a1a17;
+  
+  --color-emerald-500: #10b981;
+}
+
+@layer base {
+  body {
+    @apply bg-stone-50 text-stone-900 font-sans selection:bg-emerald-500 selection:text-white;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-black tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-xl border border-stone-200/60 shadow-sm rounded-[2rem];
+  }
+
+  .tech-border {
+    @apply border border-stone-200 relative;
+  }
+
+  .tech-border::after {
+    content: '';
+    @apply absolute -top-px -left-px w-2 h-2 border-t-2 border-l-2 border-stone-900;
+  }
+
+  .tech-border::before {
+    content: '';
+    @apply absolute -bottom-px -right-px w-2 h-2 border-b-2 border-r-2 border-stone-900;
+  }
+
+  .mono-label {
+    @apply font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-stone-200 rounded-full hover:bg-stone-300 transition-colors;
+  }
+}
+
+.markdown-body h1 { @apply text-3xl mb-4; }
+.markdown-body h2 { @apply text-2xl mb-3 mt-6; }
+.markdown-body p { @apply mb-4 leading-relaxed; }

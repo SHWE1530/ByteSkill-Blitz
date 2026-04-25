@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny for everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- VALIDATION HELPERS ---
+    function isValidUser(data) {
+      return data.uid == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && (data.role == null || data.role in ['NGO', 'Volunteer'])
+        && (data.location is string || !data.keys().hasAny(['location']))
+        && (data.orgType is string || !data.keys().hasAny(['orgType']))
+        && (data.deleted is bool || !data.keys().hasAny(['deleted']))
+        && (data.deletedAt is timestamp || !data.keys().hasAny(['deletedAt']))
+        && (data.updatedAt is timestamp || !data.keys().hasAny(['updatedAt']))
+        && (data.createdAt is timestamp || data.createdAt is number || !data.keys().hasAny(['createdAt']))
+        && (data.email is string || !data.keys().hasAny(['email']))
+        && (data.availability is bool || !data.keys().hasAny(['availability']))
+        && (data.skills is list || !data.keys().hasAny(['skills']))
+        && (data.experienceLevel is string || !data.keys().hasAny(['experienceLevel']))
+        && (data.impactScore is number || !data.keys().hasAny(['impactScore']))
+        && (data.trustScore is number || !data.keys().hasAny(['trustScore']))
+        && (data.completedTasks is number || !data.keys().hasAny(['completedTasks']));
+    }
+
+    function isValidNeed(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.ngoId == request.auth.uid
+        && (data.ngoEmail is string || !data.keys().hasAny(['ngoEmail']))
+        && data.status in ['Pending', 'In Progress', 'Completed']
+        && (data.createdAt is number || data.createdAt is timestamp || !data.keys().hasAny(['createdAt']))
+        && (data.priorityScore is number || !data.keys().hasAny(['priorityScore']))
+        && (data.peopleAffected is number || !data.keys().hasAny(['peopleAffected']))
+        && (data.urgency is string || !data.keys().hasAny(['urgency']))
+        && (data.category is string || !data.keys().hasAny(['category']))
+        && (data.location is string || !data.keys().hasAny(['location']))
+        && (data.aiSummary is string || !data.keys().hasAny(['aiSummary']))
+        && (data.deadline is number || data.deadline is timestamp || data.deadline == null || !data.keys().hasAny(['deadline']))
+        && (data.assignedVolunteers is list || !data.keys().hasAny(['assignedVolunteers']));
+    }
+
+    function isValidAssignment(data) {
+      return data.needId is string
+        && data.ngoId is string
+        && data.volunteerId is string
+        && data.status in ['Assigned', 'Accepted', 'Rejected']
+        && (data.volunteerName is string || !data.keys().hasAny(['volunteerName']))
+        && (data.timestamp is number || data.timestamp is timestamp || !data.keys().hasAny(['timestamp']))
+        && (data.rating is number || !data.keys().hasAny(['rating']))
+        && (data.feedback is string || !data.keys().hasAny(['feedback']));
+    }
+
+    // --- COLLECTION RULES ---
+
+    // Users
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // Allow listing all users for Network view
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && (
+        isValidUser(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'location', 'role', 'orgType', 'skills', 'availability', 'experienceLevel', 'impactScore', 'trustScore', 'completedTasks', 'deleted', 'deletedAt', 'updatedAt', 'createdAt', 'email'])
+        )
+      );
+    }
+
+    // Community Needs
+    match /needs/{needId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // Broad listing for discovery
+      
+      allow create: if isSignedIn() 
+        && isValidNeed(incoming());
+
+      allow update: if isSignedIn() && (
+        // Action: NGO updating their own need
+        (isOwner(existing().ngoId) && isValidNeed(incoming()) && incoming().ngoId == existing().ngoId) ||
+        
+        // Action: Volunteer joining/leaving
+        (incoming().diff(existing()).affectedKeys().hasOnly(['assignedVolunteers', 'volunteerId']) 
+         && (
+           // Joining
+           (incoming().assignedVolunteers.hasAny([request.auth.uid]) || incoming().volunteerId == request.auth.uid) ||
+           // Leaving
+           (!incoming().assignedVolunteers.hasAny([request.auth.uid]) && existing().assignedVolunteers.hasAny([request.auth.uid]))
+         )
+        )
+      );
+
+      allow delete: if isSignedIn() && isOwner(existing().ngoId);
+    }
+
+    // Assignments
+    match /assignments/{assignmentId} {
+      allow get: if isSignedIn() && (resource.data.volunteerId == request.auth.uid || resource.data.ngoId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.volunteerId == request.auth.uid || resource.data.ngoId == request.auth.uid);
+      allow create: if isSignedIn() && (incoming().volunteerId == request.auth.uid || incoming().ngoId == request.auth.uid) && isValidAssignment(incoming());
+      allow update: if isSignedIn() && (
+        (existing().volunteerId == request.auth.uid || existing().ngoId == request.auth.uid)
+      ) && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        (existing().ngoId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'feedback']))
+      );
+      allow delete: if isSignedIn() && (existing().volunteerId == request.auth.uid || existing().ngoId == request.auth.uid);
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); 
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+    }
+
+    // Daily Reports
+    match /reports/{reportId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // Broad listing for intelligence hub
+      allow create: if isSignedIn() 
+        && incoming().userId == request.auth.uid
+        && (incoming().createdAt == request.time || incoming().createdAt is number || !incoming().keys().hasAny(['createdAt']))
+        && isValidReport(incoming());
+      allow update, delete: if false; 
+    }
+
+    function isValidReport(data) {
+      return data.userId is string 
+        && data.date is string 
+        && data.content is string && data.content.size() >= 1;
+    }
+
+    // Connection Test
+    match /test/connection {
+      allow get: if true;
+    }
+  }
+}

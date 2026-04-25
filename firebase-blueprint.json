@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "Need": {
+      "title": "Need",
+      "description": "Represents a community need submitted by an NGO",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Short title of the need" },
+        "description": { "type": "string", "description": "Detailed description of the need" },
+        "category": { "type": "string", "description": "Food, Medical, Education, etc." },
+        "location": { "type": "string", "description": "Geographic location" },
+        "peopleAffected": { "type": "integer", "description": "Number of people impacted" },
+        "urgency": { "type": "string", "enum": ["Low", "Medium", "High"], "description": "Urgency level" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "priorityScore": { "type": "number", "description": "Calculated priority score" },
+        "aiSummary": { "type": "string", "description": "Gemini-generated summary" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"], "description": "Workflow status" },
+        "ngoId": { "type": "string", "description": "UID of the submitting NGO" },
+        "ngoEmail": { "type": "string", "description": "Email of the NGO" }
+      },
+      "required": ["title", "description", "category", "location", "peopleAffected", "urgency", "ngoId"]
+    },
+    "Volunteer": {
+      "title": "Volunteer",
+      "description": "User profile for a volunteer",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "string" },
+        "availability": { "type": "boolean" },
+        "experienceLevel": { "type": "string", "enum": ["Beginner", "Intermediate", "Expert"] },
+        "assignedTasks": { "type": "array", "items": { "type": "string" }, "description": "IDs of assigned needs" }
+      },
+      "required": ["name", "email", "skills", "location", "availability"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Relationship between a need and a volunteer",
+      "type": "object",
+      "properties": {
+        "needId": { "type": "string" },
+        "volunteerId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Assigned", "Accepted", "Rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["needId", "volunteerId", "status"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Daily operational report submitted by an agent or NGO",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "content": { "type": "string" },
+        "impactMinutes": { "type": "integer" },
+        "mood": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date", "content"]
+    }
+  },
+  "firestore": {
+    "needs/{needId}": {
+      "schema": "Need",
+      "description": "Collection of community needs"
+    },
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Unified user profiles (NGO/Volunteer)"
+    },
+    "assignments/{assignmentId}": {
+      "schema": "Assignment",
+      "description": "Task assignments and feedback"
+    },
+    "activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "System transition logs"
+    },
+    "notifications/{notifId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "reports/{reportId}": {
+      "schema": "Report",
+      "description": "Daily status and impact reports"
+    }
+  }
+}
